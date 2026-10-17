@@ -1,0 +1,1191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inventory Ledger Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --bg: #f6f3ee;
+    --surface: #ffffff;
+    --surface-2: #fbf9f5;
+    --field: #f3eee5;
+    --border: #e2dbcf;
+    --border-strong: #c9bfae;
+    --ink: #211b17;
+    --muted: #6b6257;
+    --faint: #9a9083;
+    --accent: #9f0b1f;
+    --accent-ink: #ffffff;
+    --accent-tint: #fbe9ea;
+    --good: #1f7a4d;
+    --good-tint: #e5f3ec;
+    --focus: #2f5fd0;
+    --radius: 12px;
+    --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    --sans: "Libre Franklin", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.5 var(--sans);
+    padding: 28px 20px 64px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1, h2, h3 { margin: 0; text-wrap: balance; }
+  h1 { font-size: clamp(22px, 3.4vw, 30px); font-weight: 800; letter-spacing: -0.01em; }
+  h2 { font-size: 16px; font-weight: 700; }
+  h3 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---------- header ---------- */
+  header { padding-bottom: 18px; border-bottom: 2px solid var(--ink); }
+  .eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  header p { color: var(--muted); margin: 8px 0 0; max-width: 680px; font-size: 13.5px; }
+
+  /* ---------- toolbar ---------- */
+  .toolbar { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between; }
+  .toolbar-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .lbl { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .seg { display: inline-flex; background: var(--field); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+  .seg button {
+    border: 0; background: transparent; border-radius: 6px; padding: 5px 10px;
+    font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap;
+  }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(33, 27, 23, 0.16); }
+  .btn {
+    border: 1px solid var(--border-strong); background: var(--surface); border-radius: 8px;
+    padding: 7px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--ink); }
+  .btn.quiet { border-style: dashed; color: var(--muted); }
+
+  /* ---------- scenarios ---------- */
+  .scenarios { margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .scenarios-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .selfcheck { font-size: 12px; font-weight: 600; }
+  .selfcheck.ok { color: var(--good); }
+  .selfcheck.bad { color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--border); background: var(--surface-2); border-radius: 999px;
+    padding: 5px 11px 5px 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; text-align: left;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: #fff; }
+  .chip .n {
+    min-width: 20px; height: 20px; border-radius: 999px; display: inline-grid; place-items: center;
+    font: 700 11px var(--mono); background: var(--field); color: var(--ink);
+  }
+  .chip[aria-pressed="true"] .n { background: rgba(255, 255, 255, 0.18); color: #fff; }
+  .chip .srs { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; color: var(--accent); }
+  .chip[aria-pressed="true"] .srs { color: #ffb3bd; }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
+  .chip .dot.bad { background: var(--accent); }
+
+  /* ---------- ledgers ---------- */
+  .ledgers { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; min-width: 0; }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .panel-head .total { font-size: 12.5px; color: var(--muted); }
+  .panel-head .total b { color: var(--ink); font: 600 13px var(--mono); }
+
+  .entry-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr) 60px 70px 28px;
+    gap: 8px; align-items: center;
+  }
+  .entry-cols { font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); padding: 0 2px 6px; }
+  .entry-cols .c { text-align: center; }
+  .entry { padding: 8px 0; border-top: 1px dashed var(--border); }
+  .entry:first-child { border-top: 0; }
+  .date { display: flex; gap: 4px; min-width: 0; }
+  input.day, input.rooms {
+    font: 500 14px var(--mono); color: var(--ink); background: var(--field);
+    border: 1px solid var(--border); border-radius: 7px; padding: 6px 4px; text-align: center; min-width: 0;
+  }
+  input.day { width: 40px; flex: none; }
+  input.rooms { width: 100%; }
+  input.day:focus, input.rooms:focus { background: var(--surface); border-color: var(--focus); outline: none; box-shadow: 0 0 0 3px rgba(47, 95, 208, 0.15); }
+  .date .seg { flex: 1; min-width: 0; }
+  .date .seg button { flex: 1; padding: 5px 3px; font-size: 11.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .arrow { color: var(--faint); text-align: center; }
+  .nights { font-size: 12px; color: var(--muted); text-align: center; white-space: nowrap; }
+  .remove {
+    width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer;
+  }
+  .remove:hover { color: var(--accent); border-color: var(--accent); }
+  .entry.invalid input, .entry.invalid .date .seg { border-color: var(--accent); }
+  .entry-msg { font-size: 11.5px; color: var(--accent); padding-top: 4px; }
+  .entry-msg:empty { display: none; }
+  .empty-row { font-size: 12.5px; color: var(--muted); padding: 10px 0; }
+  .add {
+    margin-top: 10px; width: 100%; border: 1px dashed var(--accent); background: var(--accent-tint);
+    color: var(--accent); border-radius: 8px; padding: 9px; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .add:hover { background: var(--accent); color: var(--accent-ink); border-style: solid; }
+  .hint { margin: 8px 0 0; font-size: 11.5px; color: var(--faint); }
+
+  /* ---------- results ---------- */
+  .section { margin-top: 26px; }
+  .section-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .caption { font-size: 12.5px; color: var(--muted); margin: 0 0 10px; }
+  .match { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+  .match.ok { background: var(--good-tint); color: var(--good); }
+  .match.bad { background: var(--accent-tint); color: var(--accent); }
+  .match-detail { font-size: 12px; color: var(--accent); margin: 0 0 10px; padding-left: 18px; }
+
+  .table { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .tr {
+    display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 0.8fr)) minmax(0, 1fr);
+    gap: 10px; padding: 10px 16px; align-items: center; border-top: 1px solid var(--border); font-size: 13px;
+  }
+  .tr.head { border-top: 0; font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+  .tr.two { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .tr .r { text-align: right; }
+  .tr.bad { background: var(--accent-tint); }
+  .range small { display: block; font-size: 11.5px; color: var(--faint); }
+  .avail { font-weight: 700; }
+  .tr:not(.head) .avail { color: var(--good); }
+  .tr.bad .avail, .tr.buy .avail { color: var(--accent); }
+  .pill { justify-self: end; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+  .pill.ok { background: var(--good-tint); color: var(--good); }
+  .pill.bad { background: var(--accent); color: var(--accent-ink); }
+  .dash { color: var(--faint); }
+  .empty-state { background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--radius); padding: 24px; text-align: center; color: var(--muted); font-size: 13.5px; }
+
+  details.tally { margin-top: 26px; }
+  details.tally summary { cursor: pointer; list-style: none; display: inline-flex; gap: 8px; align-items: center; }
+  details.tally summary::-webkit-details-marker { display: none; }
+  details.tally summary::before { content: "\25B8"; color: var(--muted); transition: transform 0.15s; }
+  details.tally[open] summary::before { transform: rotate(90deg); }
+  details.tally .table { margin-top: 10px; }
+
+  @media (max-width: 1100px) {
+    .ledgers { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    body { padding: 20px 16px 48px; }
+    .entry-cols { display: none; }
+    /* row 1: from → to  ×   ·   row 2: nights … rooms */
+    .entry-grid { grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr) 28px; row-gap: 8px; }
+    .date { flex-direction: column; }
+    input.day { width: 100%; }
+    .entry-grid .date.from { grid-area: 1 / 1; }
+    .entry-grid .arrow { grid-area: 1 / 2; }
+    .entry-grid .date.to { grid-area: 1 / 3; }
+    .entry-grid .remove { grid-area: 1 / 4; }
+    .entry-grid .nights { grid-area: 2 / 1; text-align: left; }
+    .entry-grid input.rooms { grid-area: 2 / 3; }
+    .tr.head { display: none; }
+    .tr, .tr.two { grid-template-columns: 1fr auto; gap: 2px 10px; }
+    .tr .range { grid-column: 1 / -1; }
+    .tr .r { text-align: left; }
+    .tr .r[data-label]::before { content: attr(data-label) " "; color: var(--muted); font: 600 12px var(--sans); }
+    .pill { justify-self: start; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">B2B Hotel Contract &amp; Sales System &middot; SRS 4.2&ndash;4.3</div>
+    <h1>Inventory Ledger Check</h1>
+    <p>Type in the purchases and sales for one hotel and the result updates as you type. Load any saved scenario below to see a worked answer, then change it to try your own dates.</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <span class="lbl" id="zqLabel">Zul-Qadah this year has</span>
+      <div class="seg" role="group" aria-labelledby="zqLabel" id="zqToggle">
+        <button type="button" data-zq="29">29 days</button>
+        <button type="button" data-zq="30">30 days</button>
+      </div>
+    </div>
+    <div class="toolbar-group">
+      <button type="button" class="btn" id="copyBtn">Copy as table</button>
+      <button type="button" class="btn quiet" id="clearBtn">Clear everything</button>
+    </div>
+  </div>
+
+  <section class="scenarios" aria-labelledby="scenariosTitle">
+    <div class="scenarios-head">
+      <h3 id="scenariosTitle">Saved scenarios</h3>
+      <span class="selfcheck" id="selfCheck"></span>
+    </div>
+    <div class="chips" id="scenarioChips"></div>
+  </section>
+
+  <div class="ledgers">
+    <section class="panel" aria-labelledby="purchasesTitle">
+      <div class="panel-head">
+        <h2 id="purchasesTitle">Purchases</h2>
+        <div class="total">Total <b id="purchasesTotal">0</b></div>
+      </div>
+      <div class="entry-cols entry-grid" aria-hidden="true"><span>From</span><span></span><span>To</span><span class="c">Nights</span><span class="c">Rooms</span><span></span></div>
+      <div id="purchasesRows"></div>
+      <div class="empty-row" id="purchasesEmpty" hidden>No purchases yet.</div>
+      <button type="button" class="add" data-kind="purchases">+ Add purchase</button>
+    </section>
+
+    <section class="panel" aria-labelledby="salesTitle">
+      <div class="panel-head">
+        <h2 id="salesTitle">Sales</h2>
+        <div class="total">Total <b id="salesTotal">0</b></div>
+      </div>
+      <div class="entry-cols entry-grid" aria-hidden="true"><span>From</span><span></span><span>To</span><span class="c">Nights</span><span class="c">Rooms</span><span></span></div>
+      <div id="salesRows"></div>
+      <div class="empty-row" id="salesEmpty" hidden>No sales yet.</div>
+      <button type="button" class="add" data-kind="sales">+ Add sale</button>
+    </section>
+  </div>
+  <p class="hint">Tip: press <b>Enter</b> to jump to the next box; Enter in a Rooms box adds a new row with the same dates.</p>
+
+  <section class="section" aria-labelledby="resultTitle">
+    <div class="section-head">
+      <h3 id="resultTitle">Result</h3>
+      <span id="matchBadge"></span>
+    </div>
+    <ul class="match-detail" id="matchDetail" hidden></ul>
+    <p class="caption" id="modeCaption"></p>
+    <div id="resultTable"></div>
+  </section>
+
+  <section class="section" aria-labelledby="needTitle">
+    <div class="section-head"><h3 id="needTitle">Needed to buy</h3></div>
+    <div id="needTable"></div>
+  </section>
+
+  <details class="tally">
+    <summary><h3>Night-by-night tally</h3></summary>
+    <div id="nightsTable"></div>
+  </details>
+
+</div>
+
+<!-- ======================================================================
+     Ledger engine: pure calculation, no DOM. verify-ledger-logic.js reads
+     this exact script out of the page, so the page and the tests can never
+     drift apart.
+     ====================================================================== -->
+<script id="ledger-engine">
+var LedgerEngine = (function () {
+  "use strict";
+
+  // Dates become one night index: Zul-Qadah day d → d, Zul-Hijjah day d →
+  // zqDays + d. A range [from, to) covers nights from..to-1 (check-in to
+  // check-out).
+  var MONTHS = { ZQ: "Zul-Qadah", ZH: "Zul-Hijjah" };
+  var ZH_DAYS = 30;
+
+  function toIndex(month, day, zqDays) { return month === "ZQ" ? day : zqDays + day; }
+  function label(idx, zqDays) { return idx <= zqDays ? idx + " " + MONTHS.ZQ : (idx - zqDays) + " " + MONTHS.ZH; }
+  function key(from, to) { return from + "_" + to; }
+  function width(r) { return r.to - r.from; }
+  function sumRooms(list) { return list.reduce(function (s, e) { return s + e.rooms; }, 0); }
+  function byStartThenWidest(a, b) { return a.from - b.from || width(b) - width(a); }
+  function monthDays(month, zqDays) { return month === "ZQ" ? zqDays : ZH_DAYS; }
+
+  // Why an entry can't be used, or null when it's fine. Shared with the UI.
+  function problemWith(e, zqDays) {
+    if (!(e.fromDay >= 1) || !(e.toDay >= 1)) return "Enter both days";
+    if (e.fromDay > monthDays(e.fromMonth, zqDays)) return MONTHS[e.fromMonth] + " has only " + monthDays(e.fromMonth, zqDays) + " days";
+    if (e.toDay > monthDays(e.toMonth, zqDays)) return MONTHS[e.toMonth] + " has only " + monthDays(e.toMonth, zqDays) + " days";
+    if (toIndex(e.toMonth, e.toDay, zqDays) <= toIndex(e.fromMonth, e.fromDay, zqDays)) return "“To” must be after “From”";
+    if (!(e.rooms > 0)) return "Enter the number of rooms";
+    return null;
+  }
+
+  function normalise(e, zqDays) {
+    if (problemWith(e, zqDays)) return null;
+    return { from: toIndex(e.fromMonth, e.fromDay, zqDays), to: toIndex(e.toMonth, e.toDay, zqDays), rooms: e.rooms };
+  }
+
+  // Each distinct range once, in first-entered order.
+  function uniqueRanges(list) {
+    var seen = {};
+    return list.filter(function (e) {
+      var k = key(e.from, e.to);
+      return seen[k] ? false : (seen[k] = true);
+    }).map(function (e) { return { from: e.from, to: e.to }; });
+  }
+
+  // Night-by-night purchased / sold / available, plus range queries on it.
+  function buildGrid(P, S) {
+    var start = Infinity, end = -Infinity;
+    P.concat(S).forEach(function (e) { start = Math.min(start, e.from); end = Math.max(end, e.to); });
+    var purchased = new Array(end - start).fill(0);
+    var sold = new Array(end - start).fill(0);
+    P.forEach(function (e) { for (var n = e.from; n < e.to; n++) purchased[n - start] += e.rooms; });
+    S.forEach(function (e) { for (var n = e.from; n < e.to; n++) sold[n - start] += e.rooms; });
+    var avail = purchased.map(function (p, i) { return p - sold[i]; });
+    return {
+      start: start, purchased: purchased, sold: sold, avail: avail,
+      // Tightest night in [from, to).
+      worst: function (from, to) {
+        var w = Infinity;
+        for (var n = from; n < to; n++) if (avail[n - start] < w) w = avail[n - start];
+        return w;
+      },
+      // First unbroken run of nights in [from, to) sitting at exactly `value`.
+      firstRun: function (from, to, value) {
+        var runFrom = null;
+        for (var n = from; n < to; n++) {
+          if (avail[n - start] === value) { if (runFrom === null) runFrom = n; }
+          else if (runFrom !== null) return { from: runFrom, to: n };
+        }
+        return runFrom === null ? null : { from: runFrom, to: to };
+      },
+    };
+  }
+
+  // ======================================================================
+  // Result: one of three rules, picked by the shape of the data.
+  //
+  //  1. LAYERS       no night is overbooked anywhere.
+  //  2. CREDIT TREE  something is short, and the widest purchase is the root
+  //                  of everything: every other purchase sits inside it, and
+  //                  no sale starts before it (or starts with it and runs
+  //                  longer). This is the SRS 4.2 leftover/credit rule.
+  //  3. CONTAINMENT  anything else, or when the tree finds nothing to split.
+  // ======================================================================
+
+  // 1. LAYERS: free rooms stacked from the widest range down. Each range
+  // shows only what it has ON TOP of the narrowest range around it (Case 5:
+  // 50 rooms on 1→10, sales 1→4 of 20 and 8→10 of 15 → 1→10 shows 30, its
+  // tightest night; 4→10 shows 35 − 30 = 5; 4→8 shows 50 − 35 = 15; 1→4 and
+  // 8→10 show 0). A sale cut from one edge of the narrowest range around it
+  // reveals the rest of that range as its own row, so no free room is
+  // hidden (105 rooms on 1→5 with only a 1→4 sale show up on 4→5).
+  function layeredRows(P, S, grid) {
+    var ranges = uniqueRanges(P.concat(S));
+    var seen = {};
+    ranges.forEach(function (r) { seen[key(r.from, r.to)] = true; });
+    function around(r) {
+      var best = null;
+      ranges.forEach(function (o) {
+        if (o.from <= r.from && o.to >= r.to && width(o) > width(r) && (best === null || width(o) < width(best))) best = o;
+      });
+      return best;
+    }
+    S.forEach(function (s) {
+      var outer = around(s);
+      if (!outer || (outer.from !== s.from && outer.to !== s.to)) return;
+      var rest = outer.from === s.from ? { from: s.to, to: outer.to } : { from: outer.from, to: s.from };
+      if (seen[key(rest.from, rest.to)]) return;
+      seen[key(rest.from, rest.to)] = true;
+      ranges.push(rest);
+    });
+    return ranges.map(function (r) {
+      var outer = around(r);
+      return { from: r.from, to: r.to, available: grid.worst(r.from, r.to) - (outer ? grid.worst(outer.from, outer.to) : 0) };
+    });
+  }
+
+  // 3. CONTAINMENT: each purchase (narrowest first) covers the sales that
+  // sit fully inside its dates, never giving more than a night has left. A
+  // 27→5 purchase of 11 fully covers a 27→1 sale of 11 and takes 11 off a
+  // 1→5 sale of 108 (→ −97); sales reaching outside it show their full sold
+  // figure as the shortfall. A purchase row shows what it has left on its
+  // tightest night.
+  function containmentRows(P, S) {
+    var need = S.map(function (s) { return s.rooms; });
+    var avail = {};
+    var add = function (k, v) { avail[k] = (avail[k] || 0) + v; };
+    P.slice().sort(function (a, b) { return width(a) - width(b); }).forEach(function (p) {
+      var cap = new Array(width(p)).fill(p.rooms);
+      S.forEach(function (s, i) {
+        if (s.from < p.from || s.to > p.to || need[i] === 0) return;
+        var give = Math.min(need[i], Math.min.apply(null, cap.slice(s.from - p.from, s.to - p.from)));
+        need[i] -= give;
+        for (var n = s.from; n < s.to; n++) cap[n - p.from] -= give;
+      });
+      add(key(p.from, p.to), Math.min.apply(null, cap));
+    });
+    S.forEach(function (s, i) { add(key(s.from, s.to), -need[i]); });
+    return uniqueRanges(P.concat(S)).map(function (r) { return { from: r.from, to: r.to, available: avail[key(r.from, r.to)] }; });
+  }
+
+  // 2a. CREDIT TREE: walk the sales in order. A sale cut from one edge of the
+  // narrowest open range around it (or, failing that, of the anchor purchase
+  // itself) opens a "leftover" for the rest of that range, holding the
+  // sale's rooms as credit. A later sale on exactly a leftover's range spends
+  // that credit; overspending charges the overage to the leftover around it
+  // (or replaces its sibling's value when there is none). Any other purchase
+  // only adds rooms to a leftover with exactly its range.
+  function creditTree(P, S, anchor, grid) {
+    var nodes = [];
+    var byKey = {};
+    var extra = {};
+    P.forEach(function (p) { if (p !== anchor) extra[key(p.from, p.to)] = (extra[key(p.from, p.to)] || 0) + p.rooms; });
+
+    function addNode(from, to, kind, value, established, siblingKey, charged) {
+      var node = {
+        from: from, to: to, kind: kind, value: value, established: established, siblingKey: siblingKey,
+        chargeInvolved: !!charged, exhausted: false, negativeExhaust: false, superseded: false, ownSaleResolved: false,
+      };
+      nodes.push(node);
+      byKey[key(from, to)] = node;
+    }
+    function narrowest(test) {
+      var best = null;
+      nodes.forEach(function (n) { if (test(n) && (best === null || width(n) < width(best))) best = n; });
+      return best;
+    }
+    function makeLeftover(from, to, amount, siblingKey, charged) {
+      var n = byKey[key(from, to)];
+      if (!n) addNode(from, to, "leftover", amount + (extra[key(from, to)] || 0), true, siblingKey, charged);
+      else if (n.established && !n.exhausted) n.value += amount;
+    }
+    function chargeOverage(spent, overage) {
+      var outer = narrowest(function (n) {
+        return n.kind === "leftover" && n.established && !n.superseded && n !== spent && n.from <= spent.from && n.to >= spent.to;
+      });
+      if (outer) {
+        outer.value -= overage;
+        outer.chargeInvolved = true;
+        var left = outer.from === spent.from;
+        var from = left ? spent.to : outer.from, to = left ? outer.to : spent.from;
+        if (from < to) makeLeftover(from, to, overage, null, true);
+        return;
+      }
+      var sib = spent.siblingKey && byKey[spent.siblingKey];
+      if (sib) { sib.value = overage; sib.chargeInvolved = true; sib.established = true; }
+    }
+
+    S.forEach(function (s) {
+      var own = byKey[key(s.from, s.to)];
+      if (own && own.kind === "leftover" && own.established && !own.exhausted) {
+        if (s.rooms <= own.value) { own.value -= s.rooms; own.ownSaleResolved = true; return; }
+        var overage = s.rooms - own.value;
+        own.exhausted = true;
+        if (grid.worst(own.from, own.to) < 0) { own.negativeExhaust = true; return; }
+        own.value = 0;
+        chargeOverage(own, overage);
+        return;
+      }
+
+      var rest = null, nested = false;
+      var outer = narrowest(function (n) { return !n.superseded && n.from <= s.from && n.to >= s.to; });
+      if (outer && width(outer) !== width(s) && (outer.from === s.from || outer.to === s.to)) {
+        rest = outer.from === s.from ? { from: s.to, to: outer.to } : { from: outer.from, to: s.from };
+        nested = true;
+      }
+      if (!rest) {
+        var a = anchor;
+        if (s.from === a.from && s.to < a.to) rest = { from: s.to, to: a.to };
+        else if (s.to === a.to && s.from > a.from) rest = { from: a.from, to: s.from };
+        else if (s.from > a.from && s.from < a.to && s.to > a.to) rest = { from: a.from, to: s.from };
+        else if (s.to > a.from && s.to < a.to && s.from < a.from) rest = { from: s.to, to: a.to };
+      }
+      if (!rest || rest.from >= rest.to) return;
+
+      // The range this sale carved up is retired; its pieces speak for it now.
+      if (nested) outer.superseded = true;
+      var restKey = key(rest.from, rest.to);
+      if (!own) addNode(s.from, s.to, "direct", 0, false, restKey, false);
+      makeLeftover(rest.from, rest.to, s.rooms, key(s.from, s.to));
+
+      // A true split also banks the sale as credit on every other open
+      // leftover it doesn't touch.
+      if (!nested) return;
+      nodes.forEach(function (n) {
+        if (key(n.from, n.to) === restKey) return;
+        if (n.kind === "leftover" && n.established && !n.exhausted && !n.superseded && (s.to <= n.from || s.from >= n.to)) n.value += s.rooms;
+      });
+    });
+    return { nodes: nodes, byKey: byKey };
+  }
+
+  // 2b. Turn the tree into rows. Leftovers the tree revealed but nobody typed
+  // take part in the clean-up passes, and stay in the result only when their
+  // rooms are really there: more than 0 and no more than the tightest night
+  // they cover (Case 4 shows 25→27 = 11 and 25→4 = 17; the same leftovers in
+  // Case 8 sit on nights with nothing free, so they stay hidden).
+  function treeRows(P, S, tree, grid) {
+    var ranges = uniqueRanges(P.concat(S));
+    var seen = {};
+    ranges.forEach(function (r) { seen[key(r.from, r.to)] = true; });
+    tree.nodes.forEach(function (n) {
+      if (n.kind !== "leftover" || !n.established || n.superseded || seen[key(n.from, n.to)]) return;
+      seen[key(n.from, n.to)] = true;
+      ranges.push({ from: n.from, to: n.to, synthetic: true });
+    });
+    ranges.forEach(function (r) { r.raw = grid.worst(r.from, r.to); });
+    var contains = function (o, r) { return o !== r && o.from <= r.from && o.to >= r.to; };
+
+    var rows = ranges.map(function (r) {
+      var node = tree.byKey[key(r.from, r.to)];
+      // A leftover that only ever absorbed its own sale reads its true floor;
+      // one built or drained by overage charges reads its credit value.
+      var useCredit = node && node.established && !node.negativeExhaust && !(node.ownSaleResolved && !node.chargeInvolved);
+      var available = useCredit ? node.value : r.raw;
+      if (!useCredit) {
+        if (available >= 0) {
+          // A positive floor that a wider range already reports is shown there.
+          if (ranges.some(function (o) { return contains(o, r) && o.raw === available; })) available = 0;
+        } else {
+          // A shortfall that a narrower range already reports is flagged
+          // there, unless the rest of this range, beside that narrower one,
+          // has a different shortfall of its own.
+          var inner = ranges.filter(function (o) { return contains(r, o) && o.raw === available; })[0];
+          if (inner) {
+            var rest = inner.from === r.from ? { from: inner.to, to: r.to } : inner.to === r.to ? { from: r.from, to: inner.from } : null;
+            var restWorst = rest && rest.from < rest.to ? grid.worst(rest.from, rest.to) : 0;
+            available = restWorst < 0 ? restWorst : 0;
+          }
+        }
+      }
+      var sold = sumRooms(S.filter(function (e) { return e.from === r.from && e.to === r.to; }));
+      return { from: r.from, to: r.to, sold: sold, available: available, synthetic: !!r.synthetic };
+    }).sort(byStartThenWidest);
+
+    var isRawFloor = function (b) { return b.available === grid.worst(b.from, b.to); };
+
+    // A sale starting inside a range and running past its end can drag both
+    // to the same figure. The wider range keeps only the nights before the
+    // overlap; the overlapping one needs just its own rooms.
+    rows.forEach(function (b) {
+      if (b.available >= 0 || !isRawFloor(b)) return;
+      var c = rows.filter(function (c) {
+        return c !== b && c.from > b.from && c.from < b.to && c.to > b.to && c.available === b.available && isRawFloor(c);
+      })[0];
+      if (!c) return;
+      b.available = grid.worst(b.from, c.from);
+      c.available = -c.sold;
+    });
+
+    // Two overbooked ranges that exactly tile a wider one: the smaller
+    // shortfall moves up to the wide range and comes off the larger one,
+    // the same convention "Needed to buy" uses.
+    rows.forEach(function (parent) {
+      var kids = rows.filter(function (b) {
+        if (b === parent || b.from < parent.from || b.to > parent.to) return false;
+        return !rows.some(function (o) { return o !== b && o !== parent && o.from <= b.from && o.to >= b.to && width(o) < width(parent); });
+      });
+      if (kids.length !== 2 || width(kids[0]) + width(kids[1]) !== width(parent)) return;
+      if (kids[0].available >= 0 || kids[1].available >= 0) return;
+      var small = Math.abs(kids[0].available) <= Math.abs(kids[1].available) ? kids[0] : kids[1];
+      var big = small === kids[0] ? kids[1] : kids[0];
+      parent.available = small.available;
+      big.available += Math.abs(small.available);
+      small.available = 0;
+    });
+
+    // Ranges that pass through the same worst nights with the same shortfall
+    // report it once, on the range whose run of those nights is narrowest.
+    var groups = {};
+    rows.forEach(function (b) {
+      if (b.available >= 0) return;
+      var run = grid.firstRun(b.from, b.to, b.available);
+      if (!run) return;
+      var k = run.from + "_" + run.to + "_" + b.available;
+      (groups[k] = groups[k] || []).push({ row: b, runWidth: width(run) });
+    });
+    Object.keys(groups).forEach(function (k) {
+      var g = groups[k];
+      if (g.length < 2) return;
+      var keep = g.reduce(function (best, x) {
+        if (x.runWidth !== best.runWidth) return x.runWidth < best.runWidth ? x : best;
+        return width(x.row) < width(best.row) ? x : best;
+      });
+      g.forEach(function (x) { if (x !== keep) x.row.available = 0; });
+    });
+
+    return rows.filter(function (b) {
+      return !b.synthetic || (b.available > 0 && b.available <= grid.worst(b.from, b.to));
+    });
+  }
+
+  // ======================================================================
+  // Needed to buy: straight from the nightly shortfall, independent of the
+  // Result rule. Walk the nights, opening a layer whenever the shortfall
+  // rises and closing every open layer whenever it dips; join equal
+  // neighbours. Then, when exactly two buys gaplessly tile a typed range,
+  // the smaller folds into that range and comes off the larger.
+  // ======================================================================
+  function needToBuy(P, S, grid) {
+    var rects = [], open = [], total = 0;
+    for (var i = 0; i <= grid.avail.length; i++) {
+      var target = i < grid.avail.length ? Math.max(0, -grid.avail[i]) : 0;
+      if (total > target) {
+        while (open.length) { var top = open.pop(); rects.push({ from: top.from, to: i, buy: top.height }); }
+        total = 0;
+      }
+      if (total < target) { open.push({ height: target - total, from: i }); total = target; }
+    }
+    rects.sort(function (a, b) { return a.from - b.from; });
+    var buys = [];
+    rects.forEach(function (r) {
+      var from = r.from + grid.start, to = r.to + grid.start, last = buys[buys.length - 1];
+      if (last && last.to === from && last.buy === r.buy) last.to = to;
+      else buys.push({ from: from, to: to, buy: r.buy });
+    });
+
+    var typed = uniqueRanges(P.concat(S));
+    var folded = true;
+    while (folded) {
+      folded = false;
+      for (var t = 0; t < typed.length && !folded; t++) {
+        var parent = typed[t];
+        var kids = buys.filter(function (b) { return b.from >= parent.from && b.to <= parent.to; });
+        if (kids.length !== 2) continue;
+        var touching = kids[0].to === kids[1].from || kids[1].to === kids[0].from;
+        if (!touching || Math.min(kids[0].from, kids[1].from) !== parent.from || Math.max(kids[0].to, kids[1].to) !== parent.to) continue;
+        var small = kids[0].buy <= kids[1].buy ? kids[0] : kids[1];
+        var big = small === kids[0] ? kids[1] : kids[0];
+        big.buy -= small.buy;
+        buys = buys.filter(function (b) { return b !== small; });
+        buys.push({ from: parent.from, to: parent.to, buy: small.buy });
+        folded = true;
+      }
+    }
+    return buys.filter(function (b) { return b.buy > 0; }).sort(byStartThenWidest);
+  }
+
+  // ======================================================================
+  function compute(input) {
+    var zq = input.zqDays;
+    var P = input.purchases.map(function (e) { return normalise(e, zq); }).filter(Boolean);
+    var S = input.sales.map(function (e) { return normalise(e, zq); }).filter(Boolean);
+    if (P.length === 0 && S.length === 0) return null;
+
+    var grid = buildGrid(P, S);
+    var mode, rows;
+    if (grid.avail.every(function (a) { return a >= 0; })) {
+      mode = "layers";
+      rows = layeredRows(P, S, grid);
+    } else {
+      var anchor = P.reduce(function (best, p) { return best === null || width(p) > width(best) ? p : best; }, null);
+      var isRoot = anchor !== null
+        && P.every(function (p) { return p.from >= anchor.from && p.to <= anchor.to; })
+        && !S.some(function (s) {
+          var overlaps = s.from < anchor.to && s.to > anchor.from;
+          return overlaps && (s.from < anchor.from || (s.from === anchor.from && s.to > anchor.to));
+        });
+      var tree = isRoot ? creditTree(P, S, anchor, grid) : null;
+      if (tree && tree.nodes.length > 0) {
+        mode = "tree";
+        rows = treeRows(P, S, tree, grid);
+      } else {
+        mode = "containment";
+        rows = containmentRows(P, S);
+      }
+    }
+
+    var lab = function (i) { return label(i, zq); };
+    var exactSum = function (list, r) { return sumRooms(list.filter(function (e) { return e.from === r.from && e.to === r.to; })); };
+    var result = rows.map(function (r) {
+      return { from: r.from, to: r.to, fromLabel: lab(r.from), toLabel: lab(r.to), purchased: exactSum(P, r), sold: exactSum(S, r), available: r.available };
+    }).sort(byStartThenWidest);
+
+    // Night-by-night: cut at every date anyone typed; each piece is uniform.
+    var cutSet = {};
+    P.concat(S).forEach(function (e) { cutSet[e.from] = true; cutSet[e.to] = true; });
+    var cuts = Object.keys(cutSet).map(Number).sort(function (a, b) { return a - b; });
+    var nights = [];
+    for (var c = 0; c + 1 < cuts.length; c++) {
+      var i = cuts[c] - grid.start;
+      nights.push({ from: cuts[c], to: cuts[c + 1], fromLabel: lab(cuts[c]), toLabel: lab(cuts[c + 1]), purchased: grid.purchased[i], sold: grid.sold[i], available: grid.avail[i] });
+    }
+
+    var need = needToBuy(P, S, grid).map(function (b) { return { from: b.from, to: b.to, fromLabel: lab(b.from), toLabel: lab(b.to), buy: b.buy }; });
+    return { mode: mode, result: result, need: need, nights: nights };
+  }
+
+  // ---- Scenarios: "25 ZQ → 4 ZH" text → entries, and expected vs actual ----
+  function parseRange(text) {
+    var m = /^\s*(\d+)\s*(ZQ|ZH)\s*(?:→|->)\s*(\d+)\s*(ZQ|ZH)\s*$/.exec(text);
+    if (!m) throw new Error("Bad range “" + text + "”; write it like “25 ZQ → 4 ZH”");
+    return { fromDay: +m[1], fromMonth: m[2], toDay: +m[3], toMonth: m[4] };
+  }
+  function caseInput(c) {
+    var entry = function (pair) { var e = parseRange(pair[0]); e.rooms = pair[1]; return e; };
+    return { zqDays: c.zqDays, purchases: c.purchases.map(entry), sales: c.sales.map(entry) };
+  }
+  function checkCase(c) {
+    var out = compute(caseInput(c));
+    var problems = [];
+    var rangeKey = function (text) {
+      var r = parseRange(text);
+      return key(toIndex(r.fromMonth, r.fromDay, c.zqDays), toIndex(r.toMonth, r.toDay, c.zqDays));
+    };
+    function compare(section, expected, actual, fields) {
+      if (!expected) return;
+      var have = {};
+      actual.forEach(function (a) { have[key(a.from, a.to)] = a; });
+      expected.forEach(function (row) {
+        var a = have[rangeKey(row[0])];
+        if (!a) { problems.push(section + ": row " + row[0] + " is missing"); return; }
+        fields.forEach(function (f, i) {
+          if (a[f] !== row[i + 1]) problems.push(section + ": " + row[0] + " " + f + " should be " + row[i + 1] + ", got " + a[f]);
+        });
+      });
+      if (actual.length !== expected.length) problems.push(section + ": expected " + expected.length + " rows, got " + actual.length);
+    }
+    compare("Night-by-night", c.nights, out ? out.nights : [], ["purchased", "sold", "available"]);
+    compare("Result", c.result, out ? out.result : [], ["purchased", "sold", "available"]);
+    compare("Needed to buy", c.need, out ? out.need : [], ["buy"]);
+    return { pass: problems.length === 0, problems: problems };
+  }
+
+  return { compute: compute, problemWith: problemWith, toIndex: toIndex, label: label, caseInput: caseInput, checkCase: checkCase };
+})();
+</script>
+
+<!-- ======================================================================
+     Saved scenarios: each one is both a one-click example on the page and
+     a test in verify-ledger-logic.js. To add a case, append an entry here:
+       purchases / sales:  [ "from → to", rooms ]
+       result:             [ "from → to", purchased, sold, available ]
+       need:               [ "from → to", rooms to buy ]
+       nights (optional):  [ "from → to", purchased, sold, available ]
+     Dates are written "25 ZQ" (Zul-Qadah) or "4 ZH" (Zul-Hijjah).
+     ====================================================================== -->
+<script id="ledger-cases">
+var LEDGER_CASES = (function () {
+  var CASE4_SALES = [["25 ZQ → 5 ZH", 99], ["25 ZQ → 1 ZH", 24], ["27 ZQ → 1 ZH", 11], ["1 ZH → 5 ZH", 108], ["4 ZH → 6 ZH", 17]];
+  return [
+    {
+      id: 1, srs: true, title: "One purchase, three overlaps", zqDays: 29,
+      purchases: [["25 ZQ → 4 ZH", 125]],
+      sales: [["25 ZQ → 4 ZH", 20], ["25 ZQ → 1 ZH", 16], ["1 ZH → 4 ZH", 121]],
+      nights: [["25 ZQ → 1 ZH", 125, 36, 89], ["1 ZH → 4 ZH", 125, 141, -16]],
+      result: [["25 ZQ → 4 ZH", 125, 20, 0], ["25 ZQ → 1 ZH", 0, 16, 89], ["1 ZH → 4 ZH", 0, 121, -16]],
+      need: [["1 ZH → 4 ZH", 16]],
+    },
+    {
+      id: 2, srs: true, title: "Purchase added after sales", zqDays: 29,
+      purchases: [["4 ZH → 14 ZH", 100], ["4 ZH → 8 ZH", 65], ["4 ZH → 8 ZH", 50]],
+      sales: [["4 ZH → 14 ZH", 15], ["8 ZH → 14 ZH", 70], ["6 ZH → 14 ZH", 15], ["4 ZH → 8 ZH", 135], ["4 ZH → 6 ZH", 58], ["6 ZH → 8 ZH", 16]],
+      nights: [["4 ZH → 6 ZH", 215, 208, 7], ["6 ZH → 8 ZH", 215, 181, 34], ["8 ZH → 14 ZH", 100, 100, 0]],
+      result: [["4 ZH → 14 ZH", 100, 15, 0], ["4 ZH → 8 ZH", 115, 135, 7], ["4 ZH → 6 ZH", 0, 58, 0], ["6 ZH → 14 ZH", 0, 15, 0], ["6 ZH → 8 ZH", 0, 16, 27], ["8 ZH → 14 ZH", 0, 70, 0]],
+      need: [],
+    },
+    {
+      id: 3, srs: true, title: "Genuine overbooking", zqDays: 29,
+      purchases: [["14 ZH → 20 ZH", 100]],
+      sales: [["14 ZH → 20 ZH", 93], ["14 ZH → 17 ZH", 22], ["17 ZH → 20 ZH", 4]],
+      nights: [["14 ZH → 17 ZH", 100, 115, -15], ["17 ZH → 20 ZH", 100, 97, 3]],
+      result: [["14 ZH → 20 ZH", 100, 93, 0], ["14 ZH → 17 ZH", 0, 22, -15], ["17 ZH → 20 ZH", 0, 4, 3]],
+      need: [["14 ZH → 17 ZH", 15]],
+    },
+    {
+      id: 4, srs: true, title: "Overbooked on an unpurchased night", zqDays: 29,
+      purchases: [["25 ZQ → 5 ZH", 406]],
+      sales: CASE4_SALES,
+      nights: [["25 ZQ → 27 ZQ", 406, 123, 283], ["27 ZQ → 1 ZH", 406, 134, 272], ["1 ZH → 4 ZH", 406, 207, 199], ["4 ZH → 5 ZH", 406, 224, 182], ["5 ZH → 6 ZH", 0, 17, -17]],
+      result: [["25 ZQ → 5 ZH", 406, 99, 182], ["25 ZQ → 4 ZH", 0, 0, 17], ["25 ZQ → 1 ZH", 0, 24, 73], ["25 ZQ → 27 ZQ", 0, 0, 11], ["27 ZQ → 1 ZH", 0, 11, 0], ["1 ZH → 5 ZH", 0, 108, 0], ["4 ZH → 6 ZH", 0, 17, -17]],
+      need: [["5 ZH → 6 ZH", 17]],
+    },
+    {
+      id: 5, title: "Unsold nights in the middle", zqDays: 29,
+      purchases: [["1 ZH → 10 ZH", 50]],
+      sales: [["1 ZH → 4 ZH", 20], ["8 ZH → 10 ZH", 15]],
+      nights: [["1 ZH → 4 ZH", 50, 20, 30], ["4 ZH → 8 ZH", 50, 0, 50], ["8 ZH → 10 ZH", 50, 15, 35]],
+      result: [["1 ZH → 10 ZH", 50, 0, 30], ["1 ZH → 4 ZH", 0, 20, 0], ["4 ZH → 10 ZH", 0, 0, 5], ["4 ZH → 8 ZH", 0, 0, 15], ["8 ZH → 10 ZH", 0, 15, 0]],
+      need: [],
+    },
+    {
+      id: 6, title: "Purchases only, no sales", zqDays: 29,
+      purchases: [["1 ZH → 8 ZH", 20], ["4 ZH → 6 ZH", 10]],
+      sales: [],
+      nights: [["1 ZH → 4 ZH", 20, 0, 20], ["4 ZH → 6 ZH", 30, 0, 30], ["6 ZH → 8 ZH", 20, 0, 20]],
+      result: [["1 ZH → 8 ZH", 20, 0, 20], ["4 ZH → 6 ZH", 10, 0, 10]],
+      need: [],
+    },
+    {
+      id: 7, title: "Small purchase on one nested sale", zqDays: 30,
+      purchases: [["27 ZQ → 1 ZH", 11]],
+      sales: CASE4_SALES,
+      result: [["25 ZQ → 5 ZH", 0, 99, -99], ["25 ZQ → 1 ZH", 0, 24, -24], ["27 ZQ → 1 ZH", 11, 11, 0], ["1 ZH → 5 ZH", 0, 108, -108], ["4 ZH → 6 ZH", 0, 17, -17]],
+      need: [["25 ZQ → 5 ZH", 123], ["1 ZH → 5 ZH", 84], ["4 ZH → 6 ZH", 17]],
+    },
+    {
+      id: 8, title: "Purchase short of its sales", zqDays: 30,
+      purchases: [["25 ZQ → 5 ZH", 123]],
+      sales: CASE4_SALES,
+      result: [["25 ZQ → 5 ZH", 123, 99, 0], ["25 ZQ → 1 ZH", 0, 24, 0], ["27 ZQ → 1 ZH", 0, 11, -11], ["1 ZH → 5 ZH", 0, 108, -84], ["4 ZH → 6 ZH", 0, 17, -17]],
+      need: [["27 ZQ → 5 ZH", 11], ["1 ZH → 5 ZH", 73], ["4 ZH → 6 ZH", 17]],
+    },
+    {
+      id: 9, title: "Purchase narrower than the sales", zqDays: 30,
+      purchases: [["27 ZQ → 5 ZH", 11]],
+      sales: CASE4_SALES,
+      result: [["25 ZQ → 5 ZH", 0, 99, -99], ["25 ZQ → 1 ZH", 0, 24, -24], ["27 ZQ → 5 ZH", 11, 0, 0], ["27 ZQ → 1 ZH", 0, 11, 0], ["1 ZH → 5 ZH", 0, 108, -97], ["4 ZH → 6 ZH", 0, 17, -17]],
+      need: [["25 ZQ → 5 ZH", 123], ["1 ZH → 5 ZH", 73], ["4 ZH → 6 ZH", 17]],
+    },
+    {
+      id: 10, title: "Purchase only on the spill-over sale", zqDays: 30,
+      purchases: [["4 ZH → 6 ZH", 17]],
+      sales: CASE4_SALES,
+      result: [["25 ZQ → 5 ZH", 0, 99, -99], ["25 ZQ → 1 ZH", 0, 24, -24], ["27 ZQ → 1 ZH", 0, 11, -11], ["1 ZH → 5 ZH", 0, 108, -108], ["4 ZH → 6 ZH", 17, 17, 0]],
+      need: [["25 ZQ → 5 ZH", 123], ["27 ZQ → 5 ZH", 11], ["1 ZH → 5 ZH", 73]],
+    },
+    {
+      id: 11, title: "Second purchase inside the first", zqDays: 30,
+      purchases: [["25 ZQ → 4 ZH", 36], ["1 ZH → 4 ZH", 105]],
+      sales: [["25 ZQ → 4 ZH", 20], ["25 ZQ → 1 ZH", 16], ["1 ZH → 4 ZH", 121]],
+      result: [["25 ZQ → 4 ZH", 36, 20, 0], ["25 ZQ → 1 ZH", 0, 16, 0], ["1 ZH → 4 ZH", 105, 121, 0]],
+      need: [],
+    },
+    {
+      id: 12, title: "Second purchase runs past the first", zqDays: 30,
+      purchases: [["25 ZQ → 4 ZH", 36], ["1 ZH → 5 ZH", 105]],
+      sales: [["25 ZQ → 4 ZH", 20], ["25 ZQ → 1 ZH", 16], ["1 ZH → 4 ZH", 121]],
+      result: [["25 ZQ → 4 ZH", 36, 20, 0], ["25 ZQ → 1 ZH", 0, 16, 0], ["1 ZH → 5 ZH", 105, 0, 0], ["1 ZH → 4 ZH", 0, 121, 0], ["4 ZH → 5 ZH", 0, 0, 105]],
+      need: [],
+    },
+  ];
+})();
+</script>
+
+<!-- ============================================================ UI -->
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "ilc_state_v2";
+  var LEGACY_KEY = "ilc_state";
+  var KINDS = ["purchases", "sales"];
+  var MONTH_NAME = { ZQ: "Zul-Qadah", ZH: "Zul-Hijjah" };
+  var MODE_CAPTION = {
+    layers: "No night is overbooked, so the free rooms are shown in layers: each row shows only what it has on top of the range around it.",
+    tree: "Worked out from the main purchase with the SRS leftover rule.",
+    containment: "Each purchase covers the sales that sit fully inside its dates; anything outside them shows as a shortfall.",
+  };
+
+  var state = { zqDays: 30, purchases: [], sales: [], nextId: 1, caseId: null };
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------------- persistence (per-viewer convenience only) ----------------
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_KEY);
+      var s = raw && JSON.parse(raw);
+      if (s && Array.isArray(s.purchases) && Array.isArray(s.sales)) {
+        state.zqDays = s.zqDays === 29 ? 29 : 30;
+        state.purchases = s.purchases;
+        state.sales = s.sales;
+        state.nextId = s.nextId || 1;
+        state.caseId = s.caseId || null;
+        KINDS.forEach(function (k) {
+          state[k].forEach(function (e) { e.id = state.nextId++; });
+        });
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  // ---------------- small helpers ----------------
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function fmt(n) { return (n < 0 ? "−" : "") + Math.abs(n).toLocaleString(); }
+  function countOrDash(n) { return n === 0 ? '<span class="dash">—</span>' : n.toLocaleString(); }
+  function nightsText(n) { return n + (n === 1 ? " night" : " nights"); }
+  function findEntry(kind, id) { return state[kind].filter(function (e) { return e.id === id; })[0]; }
+  function entryNights(e) {
+    if (LedgerEngine.problemWith(e, state.zqDays)) return null;
+    return LedgerEngine.toIndex(e.toMonth, e.toDay, state.zqDays) - LedgerEngine.toIndex(e.fromMonth, e.fromDay, state.zqDays);
+  }
+
+  // ---------------- entry rows ----------------
+  // Rows are built only on a structural change (add / remove / load). Typing
+  // updates the state and that row's own status in place, so focus stays put.
+  function monthToggle(field, value, labelText) {
+    return '<div class="seg" role="group" aria-label="' + labelText + '">' +
+      '<button type="button" data-field="' + field + '" data-value="ZQ" aria-pressed="' + (value === "ZQ") + '" title="Zul-Qadah">Qadah</button>' +
+      '<button type="button" data-field="' + field + '" data-value="ZH" aria-pressed="' + (value === "ZH") + '" title="Zul-Hijjah">Hijjah</button>' +
+      "</div>";
+  }
+  function numberInput(cls, field, value, labelText, maxlength) {
+    return '<input class="' + cls + '" data-field="' + field + '" inputmode="numeric" autocomplete="off"' +
+      (maxlength ? ' maxlength="' + maxlength + '"' : "") + ' aria-label="' + labelText + '" value="' + (value || "") + '">';
+  }
+
+  function buildRow(kind, e) {
+    var noun = kind === "purchases" ? "Purchase" : "Sale";
+    var row = document.createElement("div");
+    row.className = "entry";
+    row.dataset.id = e.id;
+    row.innerHTML =
+      '<div class="entry-grid">' +
+        '<div class="date from">' + numberInput("day", "fromDay", e.fromDay, noun + " from day", 2) + monthToggle("fromMonth", e.fromMonth, noun + " from month") + "</div>" +
+        '<span class="arrow" aria-hidden="true">→</span>' +
+        '<div class="date to">' + numberInput("day", "toDay", e.toDay, noun + " to day", 2) + monthToggle("toMonth", e.toMonth, noun + " to month") + "</div>" +
+        '<span class="nights"></span>' +
+        numberInput("rooms", "rooms", e.rooms, noun + " rooms", 5) +
+        '<button type="button" class="remove" title="Remove" aria-label="Remove ' + noun.toLowerCase() + '">×</button>' +
+      "</div>" +
+      '<div class="entry-msg" aria-live="polite"></div>';
+    refreshRowStatus(row, e);
+    return row;
+  }
+
+  function refreshRowStatus(row, e) {
+    var problem = LedgerEngine.problemWith(e, state.zqDays);
+    var n = entryNights(e);
+    row.classList.toggle("invalid", !!problem);
+    row.querySelector(".entry-msg").textContent = problem || "";
+    row.querySelector(".nights").textContent = n === null ? "—" : nightsText(n);
+  }
+
+  function renderLedger(kind) {
+    var box = $(kind + "Rows");
+    box.innerHTML = "";
+    state[kind].forEach(function (e) { box.appendChild(buildRow(kind, e)); });
+    $(kind + "Empty").hidden = state[kind].length > 0;
+    renderTotal(kind);
+  }
+  function renderTotal(kind) {
+    $(kind + "Total").textContent = state[kind].reduce(function (s, e) { return s + (e.rooms > 0 ? e.rooms : 0); }, 0).toLocaleString();
+  }
+
+  // A new row starts with the dates of `like` (or the last row) so a run of
+  // entries for the same block only needs the rooms typed.
+  function addEntry(kind, like) {
+    var base = like || state[kind][state[kind].length - 1] || { fromMonth: "ZH", fromDay: 1, toMonth: "ZH", toDay: 5 };
+    var e = { id: state.nextId++, fromMonth: base.fromMonth, fromDay: base.fromDay, toMonth: base.toMonth, toDay: base.toDay, rooms: null };
+    state[kind].push(e);
+    state.caseId = null;
+    var row = buildRow(kind, e);
+    $(kind + "Rows").appendChild(row);
+    $(kind + "Empty").hidden = true;
+    update();
+    row.querySelector(like ? "input.rooms" : "input.day").focus();
+  }
+
+  function onLedgerInput(kind, ev) {
+    var el = ev.target;
+    if (!el.dataset.field) return;
+    var row = el.closest(".entry");
+    var e = findEntry(kind, +row.dataset.id);
+    var digits = el.value.replace(/\D/g, "");
+    if (digits !== el.value) el.value = digits;
+    e[el.dataset.field] = digits === "" ? null : parseInt(digits, 10);
+    state.caseId = null;
+    refreshRowStatus(row, e);
+    if (el.dataset.field === "rooms") renderTotal(kind);
+    update();
+  }
+
+  function onLedgerClick(kind, ev) {
+    var btn = ev.target.closest("button");
+    if (!btn) return;
+    var row = btn.closest(".entry");
+    var e = findEntry(kind, +row.dataset.id);
+    if (btn.classList.contains("remove")) {
+      state[kind] = state[kind].filter(function (x) { return x !== e; });
+      state.caseId = null;
+      row.remove();
+      $(kind + "Empty").hidden = state[kind].length > 0;
+      renderTotal(kind);
+      update();
+    } else if (btn.dataset.field) {
+      e[btn.dataset.field] = btn.dataset.value;
+      btn.parentNode.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", String(b === btn)); });
+      state.caseId = null;
+      refreshRowStatus(row, e);
+      update();
+    }
+  }
+
+  // Enter moves to the next box in the row; Enter in Rooms adds a new row.
+  function onLedgerKeydown(kind, ev) {
+    if (ev.key !== "Enter" || !ev.target.matches("input")) return;
+    ev.preventDefault();
+    var row = ev.target.closest(".entry");
+    if (ev.target.classList.contains("rooms")) { addEntry(kind, findEntry(kind, +row.dataset.id)); return; }
+    var inputs = Array.prototype.slice.call(row.querySelectorAll("input"));
+    inputs[inputs.indexOf(ev.target) + 1].focus();
+  }
+
+  // ---------------- results ----------------
+  function rangeCell(r) {
+    return '<div class="range">' + esc(r.fromLabel) + " → " + esc(r.toLabel) + "<small>" + nightsText(r.to - r.from) + "</small></div>";
+  }
+  function emptyState(text) { return '<div class="empty-state">' + text + "</div>"; }
+  function rowsTable(labelText, rows, okWord, badWord, counts) {
+    return '<div class="table" role="table" aria-label="' + labelText + '">' +
+      '<div class="tr head" role="row"><div>' + (labelText === "Result" ? "Date block (as entered)" : "Nights") + '</div><div class="r">Purchased</div><div class="r">Sold</div><div class="r">Available</div><div class="r">Status</div></div>' +
+      rows.map(function (r) {
+        var bad = r.available < 0;
+        return '<div class="tr' + (bad ? " bad" : "") + '" role="row">' + rangeCell(r) +
+          '<div class="r num" data-label="Purchased">' + counts(r.purchased) + "</div>" +
+          '<div class="r num" data-label="Sold">' + counts(r.sold) + "</div>" +
+          '<div class="r num avail" data-label="Available">' + fmt(r.available) + "</div>" +
+          '<span class="pill ' + (bad ? "bad" : "ok") + '">' + (bad ? badWord : okWord) + "</span></div>";
+      }).join("") + "</div>";
+  }
+
+  function renderResults(out) {
+    if (!out) {
+      $("modeCaption").textContent = "";
+      $("resultTable").innerHTML = emptyState("Add a purchase or a sale above to see the result.");
+      $("needTable").innerHTML = emptyState("Nothing to work out yet.");
+      $("nightsTable").innerHTML = emptyState("Nothing entered yet.");
+      return;
+    }
+    $("modeCaption").textContent = MODE_CAPTION[out.mode];
+    $("resultTable").innerHTML = rowsTable("Result", out.result, "OK", "Overbooked", countOrDash);
+    $("nightsTable").innerHTML = rowsTable("Night-by-night tally", out.nights, "OK", "Short", function (n) { return n.toLocaleString(); });
+    $("needTable").innerHTML = out.need.length === 0
+      ? emptyState("Nothing to buy — every sale is already covered.")
+      : '<div class="table" role="table" aria-label="Needed to buy">' +
+        '<div class="tr two head" role="row"><div>Date range</div><div class="r">Rooms to buy</div></div>' +
+        out.need.map(function (b) {
+          return '<div class="tr two buy" role="row">' + rangeCell(b) + '<div class="r num avail" data-label="Buy">' + b.buy.toLocaleString() + "</div></div>";
+        }).join("") + "</div>";
+  }
+
+  function renderMatch() {
+    var badge = $("matchBadge"), detail = $("matchDetail");
+    var c = LEDGER_CASES.filter(function (x) { return x.id === state.caseId; })[0];
+    detail.hidden = true;
+    document.querySelectorAll(".chip[data-case]").forEach(function (b) { b.setAttribute("aria-pressed", String(+b.dataset.case === state.caseId)); });
+    if (!c) { badge.className = ""; badge.textContent = ""; return; }
+    var check = LedgerEngine.checkCase(c);
+    badge.className = "match " + (check.pass ? "ok" : "bad");
+    badge.textContent = (check.pass ? "✓ Matches the expected answer for scenario " : "✗ Differs from the expected answer for scenario ") + c.id;
+    if (!check.pass) {
+      detail.innerHTML = check.problems.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("");
+      detail.hidden = false;
+    }
+  }
+
+  function update() {
+    renderResults(LedgerEngine.compute(state));
+    renderMatch();
+    save();
+  }
+
+  // ---------------- scenarios ----------------
+  function renderScenarios() {
+    var failing = [];
+    $("scenarioChips").innerHTML = LEDGER_CASES.map(function (c) {
+      var ok = LedgerEngine.checkCase(c).pass;
+      if (!ok) failing.push(c.id);
+      return '<button type="button" class="chip" data-case="' + c.id + '" aria-pressed="false" title="' + (ok ? "Matches its expected answer" : "Does not match its expected answer") + '">' +
+        '<span class="n">' + c.id + "</span>" + (c.srs ? '<span class="srs">SRS</span>' : "") + esc(c.title) +
+        '<span class="dot' + (ok ? "" : " bad") + '"></span></button>';
+    }).join("");
+    var sc = $("selfCheck");
+    sc.className = "selfcheck " + (failing.length ? "bad" : "ok");
+    sc.textContent = failing.length
+      ? failing.length + " of " + LEDGER_CASES.length + " scenarios don’t match (" + failing.join(", ") + ")"
+      : "✓ All " + LEDGER_CASES.length + " scenarios match their expected answers";
+  }
+  function loadScenario(id) {
+    var input = LedgerEngine.caseInput(LEDGER_CASES.filter(function (x) { return x.id === id; })[0]);
+    state.zqDays = input.zqDays;
+    KINDS.forEach(function (k) { state[k] = input[k].map(function (e) { e.id = state.nextId++; return e; }); });
+    state.caseId = id;
+    renderAll();
+  }
+
+  // ---------------- toolbar ----------------
+  function renderAll() {
+    document.querySelectorAll("#zqToggle button").forEach(function (b) { b.setAttribute("aria-pressed", String(+b.dataset.zq === state.zqDays)); });
+    KINDS.forEach(renderLedger);
+    update();
+  }
+
+  // The same markdown tables used when discussing a case, inputs included.
+  function markdown() {
+    var out = LedgerEngine.compute(state);
+    var day = function (d) { return d || "?"; };
+    var range = function (e) { return day(e.fromDay) + " " + MONTH_NAME[e.fromMonth] + " → " + day(e.toDay) + " " + MONTH_NAME[e.toMonth]; };
+    var dash = function (n) { return n === 0 ? "—" : String(n); };
+    var lines = ["Zul-Qadah: " + state.zqDays + " days", ""];
+    KINDS.forEach(function (k) {
+      lines.push("### " + (k === "purchases" ? "Purchases" : "Sales"), "", "| Date range | Rooms |", "| --- | --- |");
+      state[k].forEach(function (e) { lines.push("| " + range(e) + " | " + (e.rooms || "") + " |"); });
+      lines.push("");
+    });
+    if (out) {
+      lines.push("### Result", "", "| Date block (as entered) | Purchased | Sold | Available | Status |", "| --- | --- | --- | --- | --- |");
+      out.result.forEach(function (r) {
+        lines.push("| " + r.fromLabel + " → " + r.toLabel + " | " + dash(r.purchased) + " | " + dash(r.sold) + " | " + r.available + " | " + (r.available < 0 ? "Overbooked" : "OK") + " |");
+      });
+      lines.push("", "### Needed to buy", "", "| Date range | Rooms to buy |", "| --- | --- |");
+      out.need.forEach(function (b) { lines.push("| " + b.fromLabel + " → " + b.toLabel + " | " + b.buy + " |"); });
+    }
+    return lines.join("\n");
+  }
+  function copyText(text, done) {
+    var fallback = function () {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch (e) {}
+      ta.remove();
+      done();
+    };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+  }
+
+  // ---------------- wiring ----------------
+  KINDS.forEach(function (kind) {
+    var box = $(kind + "Rows");
+    box.addEventListener("input", function (ev) { onLedgerInput(kind, ev); });
+    box.addEventListener("click", function (ev) { onLedgerClick(kind, ev); });
+    box.addEventListener("keydown", function (ev) { onLedgerKeydown(kind, ev); });
+    // Select the whole number on focus so typing replaces it; deferred so a
+    // mouse click's own caret placement doesn't undo the selection.
+    box.addEventListener("focusin", function (ev) {
+      if (ev.target.matches("input")) setTimeout(function () { ev.target.select(); }, 0);
+    });
+  });
+  document.querySelectorAll("button.add").forEach(function (b) {
+    b.addEventListener("click", function () { addEntry(b.dataset.kind); });
+  });
+  $("scenarioChips").addEventListener("click", function (ev) {
+    var b = ev.target.closest(".chip");
+    if (b) loadScenario(+b.dataset.case);
+  });
+  $("zqToggle").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button");
+    if (!b) return;
+    state.zqDays = +b.dataset.zq;
+    state.caseId = null;
+    renderAll();
+  });
+  $("clearBtn").addEventListener("click", function () {
+    state.purchases = [];
+    state.sales = [];
+    state.caseId = null;
+    renderAll();
+  });
+  $("copyBtn").addEventListener("click", function () {
+    var btn = $("copyBtn");
+    copyText(markdown(), function () {
+      btn.textContent = "Copied ✓";
+      setTimeout(function () { btn.textContent = "Copy as table"; }, 1600);
+    });
+  });
+
+  renderScenarios();
+  if (load()) renderAll();
+  else loadScenario(1);
+})();
+</script>
+</body>
+</html>
