@@ -710,16 +710,18 @@ var LedgerEngine = (function () {
     if (!m) throw new Error("Bad range “" + text + "”; write it like “25 ZQ → 4 ZH”");
     return { fromDay: +m[1], fromMonth: m[2], toDay: +m[3], toMonth: m[4] };
   }
+  // Zul-Qadah has 30 days unless a scenario says `zqDays: 29`.
+  function zqDaysOf(c) { return c.zqDays || 30; }
   function caseInput(c) {
     var entry = function (pair) { var e = parseRange(pair[0]); e.rooms = pair[1]; return e; };
-    return { zqDays: c.zqDays, purchases: c.purchases.map(entry), sales: c.sales.map(entry) };
+    return { zqDays: zqDaysOf(c), purchases: c.purchases.map(entry), sales: c.sales.map(entry) };
   }
   function checkCase(c) {
     var out = compute(caseInput(c));
     var problems = [];
     var rangeKey = function (text) {
       var r = parseRange(text);
-      return key(toIndex(r.fromMonth, r.fromDay, c.zqDays), toIndex(r.toMonth, r.toDay, c.zqDays));
+      return key(toIndex(r.fromMonth, r.fromDay, zqDaysOf(c)), toIndex(r.toMonth, r.toDay, zqDaysOf(c)));
     };
     function compare(section, expected, actual, fields) {
       if (!expected) return;
@@ -751,14 +753,15 @@ var LedgerEngine = (function () {
        result:             [ "from → to", purchased, sold, available ]
        need:               [ "from → to", rooms to buy ]
        nights (optional):  [ "from → to", purchased, sold, available ]
-     Dates are written "25 ZQ" (Zul-Qadah) or "4 ZH" (Zul-Hijjah).
+     Dates are written "25 ZQ" (Zul-Qadah) or "4 ZH" (Zul-Hijjah). Zul-Qadah
+     is taken as 30 days; add `zqDays: 29` to a scenario that needs 29.
      ====================================================================== -->
 <script id="ledger-cases">
 var LEDGER_CASES = (function () {
   var CASE4_SALES = [["25 ZQ → 5 ZH", 99], ["25 ZQ → 1 ZH", 24], ["27 ZQ → 1 ZH", 11], ["1 ZH → 5 ZH", 108], ["4 ZH → 6 ZH", 17]];
   return [
     {
-      id: 1, srs: true, title: "One purchase, three overlaps", zqDays: 29,
+      id: 1, srs: true, title: "One purchase, three overlaps",
       purchases: [["25 ZQ → 4 ZH", 125]],
       sales: [["25 ZQ → 4 ZH", 20], ["25 ZQ → 1 ZH", 16], ["1 ZH → 4 ZH", 121]],
       nights: [["25 ZQ → 1 ZH", 125, 36, 89], ["1 ZH → 4 ZH", 125, 141, -16]],
@@ -766,7 +769,7 @@ var LEDGER_CASES = (function () {
       need: [["1 ZH → 4 ZH", 16]],
     },
     {
-      id: 2, srs: true, title: "Purchase added after sales", zqDays: 29,
+      id: 2, srs: true, title: "Purchase added after sales",
       purchases: [["4 ZH → 14 ZH", 100], ["4 ZH → 8 ZH", 65], ["4 ZH → 8 ZH", 50]],
       sales: [["4 ZH → 14 ZH", 15], ["8 ZH → 14 ZH", 70], ["6 ZH → 14 ZH", 15], ["4 ZH → 8 ZH", 135], ["4 ZH → 6 ZH", 58], ["6 ZH → 8 ZH", 16]],
       nights: [["4 ZH → 6 ZH", 215, 208, 7], ["6 ZH → 8 ZH", 215, 181, 34], ["8 ZH → 14 ZH", 100, 100, 0]],
@@ -774,7 +777,7 @@ var LEDGER_CASES = (function () {
       need: [],
     },
     {
-      id: 3, srs: true, title: "Genuine overbooking", zqDays: 29,
+      id: 3, srs: true, title: "Genuine overbooking",
       purchases: [["14 ZH → 20 ZH", 100]],
       sales: [["14 ZH → 20 ZH", 93], ["14 ZH → 17 ZH", 22], ["17 ZH → 20 ZH", 4]],
       nights: [["14 ZH → 17 ZH", 100, 115, -15], ["17 ZH → 20 ZH", 100, 97, 3]],
@@ -782,7 +785,7 @@ var LEDGER_CASES = (function () {
       need: [["14 ZH → 17 ZH", 15]],
     },
     {
-      id: 4, srs: true, title: "Overbooked on an unpurchased night", zqDays: 29,
+      id: 4, srs: true, title: "Overbooked on an unpurchased night",
       purchases: [["25 ZQ → 5 ZH", 406]],
       sales: CASE4_SALES,
       nights: [["25 ZQ → 27 ZQ", 406, 123, 283], ["27 ZQ → 1 ZH", 406, 134, 272], ["1 ZH → 4 ZH", 406, 207, 199], ["4 ZH → 5 ZH", 406, 224, 182], ["5 ZH → 6 ZH", 0, 17, -17]],
@@ -790,7 +793,7 @@ var LEDGER_CASES = (function () {
       need: [["5 ZH → 6 ZH", 17]],
     },
     {
-      id: 5, title: "Unsold nights in the middle", zqDays: 29,
+      id: 5, title: "Unsold nights in the middle",
       purchases: [["1 ZH → 10 ZH", 50]],
       sales: [["1 ZH → 4 ZH", 20], ["8 ZH → 10 ZH", 15]],
       nights: [["1 ZH → 4 ZH", 50, 20, 30], ["4 ZH → 8 ZH", 50, 0, 50], ["8 ZH → 10 ZH", 50, 15, 35]],
@@ -798,7 +801,7 @@ var LEDGER_CASES = (function () {
       need: [],
     },
     {
-      id: 6, title: "Purchases only, no sales", zqDays: 29,
+      id: 6, title: "Purchases only, no sales",
       purchases: [["1 ZH → 8 ZH", 20], ["4 ZH → 6 ZH", 10]],
       sales: [],
       nights: [["1 ZH → 4 ZH", 20, 0, 20], ["4 ZH → 6 ZH", 30, 0, 30], ["6 ZH → 8 ZH", 20, 0, 20]],
@@ -806,42 +809,42 @@ var LEDGER_CASES = (function () {
       need: [],
     },
     {
-      id: 7, title: "Small purchase on one nested sale", zqDays: 30,
+      id: 7, title: "Small purchase on one nested sale",
       purchases: [["27 ZQ → 1 ZH", 11]],
       sales: CASE4_SALES,
       result: [["25 ZQ → 5 ZH", 0, 99, -99], ["25 ZQ → 1 ZH", 0, 24, -24], ["27 ZQ → 1 ZH", 11, 11, 0], ["1 ZH → 5 ZH", 0, 108, -108], ["4 ZH → 6 ZH", 0, 17, -17]],
       need: [["25 ZQ → 5 ZH", 123], ["1 ZH → 5 ZH", 84], ["4 ZH → 6 ZH", 17]],
     },
     {
-      id: 8, title: "Purchase short of its sales", zqDays: 30,
+      id: 8, title: "Purchase short of its sales",
       purchases: [["25 ZQ → 5 ZH", 123]],
       sales: CASE4_SALES,
       result: [["25 ZQ → 5 ZH", 123, 99, 0], ["25 ZQ → 1 ZH", 0, 24, 0], ["27 ZQ → 1 ZH", 0, 11, -11], ["1 ZH → 5 ZH", 0, 108, -84], ["4 ZH → 6 ZH", 0, 17, -17]],
       need: [["27 ZQ → 5 ZH", 11], ["1 ZH → 5 ZH", 73], ["4 ZH → 6 ZH", 17]],
     },
     {
-      id: 9, title: "Purchase narrower than the sales", zqDays: 30,
+      id: 9, title: "Purchase narrower than the sales",
       purchases: [["27 ZQ → 5 ZH", 11]],
       sales: CASE4_SALES,
       result: [["25 ZQ → 5 ZH", 0, 99, -99], ["25 ZQ → 1 ZH", 0, 24, -24], ["27 ZQ → 5 ZH", 11, 0, 0], ["27 ZQ → 1 ZH", 0, 11, 0], ["1 ZH → 5 ZH", 0, 108, -97], ["4 ZH → 6 ZH", 0, 17, -17]],
       need: [["25 ZQ → 5 ZH", 123], ["1 ZH → 5 ZH", 73], ["4 ZH → 6 ZH", 17]],
     },
     {
-      id: 10, title: "Purchase only on the spill-over sale", zqDays: 30,
+      id: 10, title: "Purchase only on the spill-over sale",
       purchases: [["4 ZH → 6 ZH", 17]],
       sales: CASE4_SALES,
       result: [["25 ZQ → 5 ZH", 0, 99, -99], ["25 ZQ → 1 ZH", 0, 24, -24], ["27 ZQ → 1 ZH", 0, 11, -11], ["1 ZH → 5 ZH", 0, 108, -108], ["4 ZH → 6 ZH", 17, 17, 0]],
       need: [["25 ZQ → 5 ZH", 123], ["27 ZQ → 5 ZH", 11], ["1 ZH → 5 ZH", 73]],
     },
     {
-      id: 11, title: "Second purchase inside the first", zqDays: 30,
+      id: 11, title: "Second purchase inside the first",
       purchases: [["25 ZQ → 4 ZH", 36], ["1 ZH → 4 ZH", 105]],
       sales: [["25 ZQ → 4 ZH", 20], ["25 ZQ → 1 ZH", 16], ["1 ZH → 4 ZH", 121]],
       result: [["25 ZQ → 4 ZH", 36, 20, 0], ["25 ZQ → 1 ZH", 0, 16, 0], ["1 ZH → 4 ZH", 105, 121, 0]],
       need: [],
     },
     {
-      id: 12, title: "Second purchase runs past the first", zqDays: 30,
+      id: 12, title: "Second purchase runs past the first",
       purchases: [["25 ZQ → 4 ZH", 36], ["1 ZH → 5 ZH", 105]],
       sales: [["25 ZQ → 4 ZH", 20], ["25 ZQ → 1 ZH", 16], ["1 ZH → 4 ZH", 121]],
       result: [["25 ZQ → 4 ZH", 36, 20, 0], ["25 ZQ → 1 ZH", 0, 16, 0], ["1 ZH → 5 ZH", 105, 0, 0], ["1 ZH → 4 ZH", 0, 121, 0], ["4 ZH → 5 ZH", 0, 0, 105]],
